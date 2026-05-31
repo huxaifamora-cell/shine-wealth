@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TrendRider"/>
+<link rel="manifest" href="/manifest.json"/>
+<title>TrendRider Alerts</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #111118;
+    --border:    #1e1e2a;
+    --accent:    #c8ff00;
+    --red:       #ff4545;
+    --amber:     #ffb800;
+    --text:      #e8e8f0;
+    --muted:     #555566;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  body {
+    display: flex; flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── scan-line overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+    pointer-events: none; z-index: 1000;
+  }
+
+  header {
+    padding: 20px 24px 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+  }
+
+  .logo {
+    font-family: var(--sans);
+    font-weight: 800; font-size: 22px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .status-pill.ok    { color: var(--accent); border-color: var(--accent); }
+  .status-pill.warn  { color: var(--amber);  border-color: var(--amber);  }
+  .status-pill.off   { color: var(--muted);  border-color: var(--muted);  }
+
+  main { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Subscribe card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    display: block; width: 100%;
+    padding: 14px;
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    background: var(--accent); color: #000;
+    border: none; border-radius: 2px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn.secondary {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .sub-status {
+    margin-top: 10px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted);
+    min-height: 16px;
+  }
+  .sub-status.good { color: var(--accent); }
+  .sub-status.bad  { color: var(--red); }
+
+  /* ── Alert feed */
+  .feed-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  #alert-list { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+
+  .alert-item {
+    border-left: 3px solid var(--muted);
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 0 2px 2px 0;
+    animation: slideIn 0.25s ease;
+  }
+  .alert-item.SIGNAL { border-color: var(--red);   }
+  .alert-item.READY  { border-color: var(--amber);  }
+  .alert-item.WATCH  { border-color: var(--accent); }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  .alert-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .alert-level {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .alert-level.SIGNAL { color: var(--red); }
+  .alert-level.READY  { color: var(--amber); }
+  .alert-level.WATCH  { color: var(--accent); }
+  .alert-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  .alert-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+  .alert-body  { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+  .empty-state {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    text-align: center; padding: 24px 0;
+  }
+
+  /* ── Info strip */
+  .info-strip {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding: 14px 24px;
+    line-height: 1.6;
+  }
+  .info-strip a { color: var(--accent); text-decoration: none; }
+
+  /* ── Blink dot */
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  .dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--muted);
+    vertical-align: middle; margin-right: 6px;
+  }
+  .dot.live { background: var(--accent); animation: blink 1.4s infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Trend<span>Rider</span></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px">SIGNAL MONITOR</div>
+  </div>
+  <div id="conn-status" class="status-pill off">OFFLINE</div>
+</header>
+
+<main>
+
+  <!-- Subscribe card -->
+  <div class="card">
+    <div class="card-label">Push Notifications</div>
+    <button class="btn" id="sub-btn" onclick="handleSubscribe()">Enable Alerts</button>
+    <div class="sub-status" id="sub-msg">Tap to receive signal alerts on this device.</div>
+  </div>
+
+  <!-- Alert feed -->
+  <div class="card" style="flex:1">
+    <div class="feed-header">
+      <div class="card-label" style="margin:0">
+        <span class="dot" id="live-dot"></span>Recent Signals
+      </div>
+      <button class="btn secondary" style="width:auto;padding:6px 14px;font-size:10px" onclick="clearFeed()">Clear</button>
+    </div>
+    <div id="alert-list"><div class="empty-state">No signals yet.<br/>Alerts appear here when received.</div></div>
+  </div>
+
+</main>
+
+<div class="info-strip">
+  Add to home screen: tap browser menu → "Add to Home Screen" for app-like experience.<br/>
+  Notifications arrive even when the app is closed.
+</div>
+
+<script>
+const STORAGE_KEY = 'tr_alerts';
+let vapidKey = null;
+let alerts   = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+// ── Load VAPID key from server
+fetch('/vapid-public-key').then(r => r.json()).then(d => { vapidKey = d.key; checkExistingSubscription(); })
+  .catch(() => setMsg('Cannot reach server.', 'bad'));
+
+// ── Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    setConn('ok');
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'PUSH') addAlert(e.data);
+    });
+  }).catch(() => setConn('warn'));
+}
+
+// ── Check if already subscribed
+async function checkExistingSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setMsg('Push not supported in this browser. Try Chrome or Edge.', 'bad');
+    document.getElementById('sub-btn').disabled = true;
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    setMsg('✓ Alerts active on this device.', 'good');
+    document.getElementById('sub-btn').textContent = 'Subscribed ✓';
+    document.getElementById('sub-btn').disabled = true;
+    document.getElementById('live-dot').classList.add('live');
+    setConn('ok');
+  }
+}
+
+// ── Subscribe handler
+async function handleSubscribe() {
+  if (!vapidKey) { setMsg('Server not ready. Refresh and try again.', 'bad'); return; }
+
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { setMsg('Permission denied. Enable in phone settings.', 'bad'); return; }
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey)
+    });
+
+    const resp = await fetch('/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub)
+    });
+
+    if (resp.ok) {
+      setMsg('✓ Alerts active on this device.', 'good');
+      document.getElementById('sub-btn').textContent = 'Subscribed ✓';
+      document.getElementById('sub-btn').disabled = true;
+      document.getElementById('live-dot').classList.add('live');
+      setConn('ok');
+    } else {
+      setMsg('Server error. Try again.', 'bad');
+    }
+  } catch (err) {
+    setMsg('Error: ' + err.message, 'bad');
+  }
+}
+
+// ── Render alerts
+function renderAlerts() {
+  const list = document.getElementById('alert-list');
+  if (!alerts.length) {
+    list.innerHTML = '<div class="empty-state">No signals yet.<br/>Alerts appear here when received.</div>';
+    return;
+  }
+  list.innerHTML = alerts.slice(0, 30).map(a => {
+    const t = new Date(a.timestamp);
+    const time = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="alert-item ${a.level || ''}">
+      <div class="alert-top">
+        <span class="alert-level ${a.level || ''}">${a.level || 'ALERT'}</span>
+        <span class="alert-time">${time}</span>
+      </div>
+      <div class="alert-title">${esc(a.title || '')}</div>
+      <div class="alert-body">${esc(a.body || '')}</div>
+    </div>`;
+  }).join('');
+}
+
+function addAlert(data) {
+  alerts.unshift(data);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts.slice(0, 50)));
+  renderAlerts();
+}
+
+function clearFeed() {
+  alerts = [];
+  localStorage.removeItem(STORAGE_KEY);
+  renderAlerts();
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setMsg(msg, cls) {
+  const el = document.getElementById('sub-msg');
+  el.textContent = msg;
+  el.className = 'sub-status' + (cls ? ' ' + cls : '');
+}
+function setConn(state) {
+  const el = document.getElementById('conn-status');
+  el.textContent = state === 'ok' ? 'ONLINE' : state === 'warn' ? 'PARTIAL' : 'OFFLINE';
+  el.className   = 'status-pill ' + state;
+}
+
+// ── Listen for push data relayed from SW via postMessage
+navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', e => {
+  if (e.data && e.data.type === 'NEW_ALERT') addAlert(e.data.payload);
+});
+
+// ── VAPID helper
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw     = atob(base64);
+  const output  = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+renderAlerts();
+</script>
+</body>
+</html>
