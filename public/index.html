@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Shine Wealth"/>
+<link rel="manifest" href="/manifest.json"/>
+<title>Shine Wealth Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0a0a0f;
+    --surface: #111118;
+    --border:  #1e1e2a;
+    --accent:  #ffb800;
+    --green:   #00e676;
+    --red:     #ff4545;
+    --text:    #e8e8f0;
+    --muted:   #555566;
+    --mono:    'Space Mono', monospace;
+    --sans:    'Syne', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body { display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+    pointer-events: none; z-index: 1000;
+  }
+
+  header { padding: 20px 24px 0; display: flex; align-items: flex-start; justify-content: space-between; }
+
+  .logo { font-family: var(--sans); font-weight: 800; font-size: 20px; letter-spacing: -0.5px; line-height: 1; }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .status-pill {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    padding: 4px 10px; border-radius: 2px; border: 1px solid currentColor;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .status-pill.ok   { color: var(--accent); border-color: var(--accent); }
+  .status-pill.warn { color: var(--red);    border-color: var(--red);    }
+  .status-pill.off  { color: var(--muted);  border-color: var(--muted);  }
+
+  /* ── Mute toggle button */
+  .mute-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .mute-btn:hover { color: var(--text); border-color: var(--muted); }
+  .mute-btn.muted { color: var(--red); border-color: var(--red); }
+  .mute-btn .icon { font-size: 12px; }
+
+  main { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; }
+
+  .card-label {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;
+  }
+
+  .btn {
+    display: block; width: 100%; padding: 14px;
+    font-family: var(--mono); font-size: 13px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    background: var(--accent); color: #000;
+    border: none; border-radius: 2px; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn.secondary {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .sub-status { margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); min-height: 16px; }
+  .sub-status.good { color: var(--accent); }
+  .sub-status.bad  { color: var(--red); }
+
+  /* ── Active signals banner */
+  .active-signals-card {
+    background: rgba(255,184,0,0.05);
+    border: 1px solid rgba(255,184,0,0.2);
+    border-radius: 4px;
+    padding: 14px 18px;
+  }
+  .active-signals-card .card-label { color: var(--accent); margin-bottom: 10px; }
+  .active-signals-grid { display: flex; flex-direction: column; gap: 6px; }
+  .active-signal-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px;
+    padding: 7px 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 2px;
+    border-left: 3px solid var(--muted);
+  }
+  .active-signal-row.BUY  { border-left-color: var(--green); }
+  .active-signal-row.SELL { border-left-color: var(--red); }
+  .active-signal-sym { font-weight: 700; font-size: 12px; }
+  .active-signal-meta { color: var(--muted); font-size: 10px; }
+  .active-signal-dir { font-weight: 700; font-size: 10px; letter-spacing: 1px; }
+  .active-signal-dir.BUY  { color: var(--green); }
+  .active-signal-dir.SELL { color: var(--red); }
+  .no-active { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: center; padding: 8px 0; }
+
+  .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+
+  #alert-list { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+
+  .alert-item {
+    border-left: 3px solid var(--muted);
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 0 2px 2px 0;
+    animation: slideIn 0.25s ease;
+  }
+  .alert-item.BUY     { border-color: var(--green);  }
+  .alert-item.SELL    { border-color: var(--red);    }
+  .alert-item.REMOVED { border-color: var(--muted);  }
+
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  .alert-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+
+  .alert-level { font-family: var(--mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .alert-level.BUY     { color: var(--green); }
+  .alert-level.SELL    { color: var(--red);   }
+  .alert-level.REMOVED { color: var(--muted); }
+
+  .alert-time  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .alert-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+  .alert-body  { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+  .empty-state { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: center; padding: 24px 0; }
+
+  .info-strip {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border-top: 1px solid var(--border); padding: 14px 24px; line-height: 1.6;
+  }
+
+  /* ── Mute toast */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 11px;
+    padding: 8px 18px; border-radius: 2px;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none; z-index: 9999; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); vertical-align: middle; margin-right: 6px; }
+  .dot.live { background: var(--accent); animation: blink 1.4s infinite; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Shine <span>Wealth</span></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px">SIGNAL MONITOR</div>
+  </div>
+  <div class="header-right">
+    <button class="mute-btn" id="mute-btn" onclick="toggleMute()" title="Mute/unmute sound alerts">
+      <span class="icon" id="mute-icon">🔔</span>
+      <span id="mute-label">SOUND</span>
+    </button>
+    <div id="conn-status" class="status-pill off">OFFLINE</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Active Signals (live from server) -->
+  <div class="active-signals-card" id="active-signals-card">
+    <div class="card-label">⚡ Active Signals Now</div>
+    <div class="active-signals-grid" id="active-signals-grid">
+      <div class="no-active">Loading signals...</div>
+    </div>
+  </div>
+
+  <!-- Subscribe card -->
+  <div class="card">
+    <div class="card-label">Push Notifications</div>
+    <button class="btn" id="sub-btn" onclick="handleSubscribe()">Enable Alerts</button>
+    <div class="sub-status" id="sub-msg">Tap to receive signal alerts on this device.</div>
+  </div>
+
+  <!-- Alert feed -->
+  <div class="card" style="flex:1">
+    <div class="feed-header">
+      <div class="card-label" style="margin:0">
+        <span class="dot" id="live-dot"></span>Recent Alerts
+      </div>
+      <button class="btn secondary" style="width:auto;padding:6px 14px;font-size:10px" onclick="clearFeed()">Clear</button>
+    </div>
+    <div id="alert-list"><div class="empty-state">No alerts yet.<br/>Alerts appear here when received.</div></div>
+  </div>
+
+</main>
+
+<div class="info-strip">
+  Add to home screen: browser menu → "Add to Home Screen" for app-like experience.<br/>
+  Notifications arrive even when the app is closed.
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY  = 'shine_alerts';
+const MUTE_KEY     = 'shine_muted';
+let vapidKey = null;
+let alerts   = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let isMuted  = localStorage.getItem(MUTE_KEY) === 'true';
+
+// ── Init mute state
+updateMuteUI();
+
+// ── Fetch VAPID key + existing signals in parallel
+fetch('/vapid-public-key')
+  .then(r => r.json())
+  .then(d => { vapidKey = d.key; checkExistingSubscription(); })
+  .catch(() => setMsg('Cannot reach server.', 'bad'));
+
+// ── Load active signals from server on startup
+fetch('/active-signals')
+  .then(r => r.json())
+  .then(d => renderActiveSignals(d.signals || []))
+  .catch(() => renderActiveSignals([]));
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(() => setConn('ok'))
+    .catch(() => setConn('warn'));
+}
+
+navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', e => {
+  if (e.data && e.data.type === 'NEW_ALERT')   handleIncomingAlert(e.data.payload);
+  if (e.data && e.data.type === 'PLAY_SOUND')  playAlertSound();
+});
+
+// ── Render active signals panel
+function renderActiveSignals(signals) {
+  const grid = document.getElementById('active-signals-grid');
+  if (!signals.length) {
+    grid.innerHTML = '<div class="no-active">No active signals at the moment.</div>';
+    return;
+  }
+  grid.innerHTML = signals.map(s => {
+    const dir = (s.level || '').toUpperCase();
+    return `<div class="active-signal-row ${dir}">
+      <div>
+        <div class="active-signal-sym">${esc(s.symbol || '')} <span style="color:var(--muted);font-weight:400">${esc(s.timeframe || '')}</span></div>
+        <div class="active-signal-meta">H4: ${esc(s.h4_trend || '—')} &nbsp;|&nbsp; D1: ${esc(s.d1_trend || '—')}</div>
+      </div>
+      <span class="active-signal-dir ${dir}">${dir === 'BUY' ? '🟢' : '🔴'} ${dir}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Handle incoming alert (from SW message)
+function handleIncomingAlert(payload) {
+  addAlert(payload);
+  // Refresh active signals panel
+  fetch('/active-signals')
+    .then(r => r.json())
+    .then(d => renderActiveSignals(d.signals || []))
+    .catch(() => {});
+}
+
+async function checkExistingSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    setMsg('Push not supported. Use Chrome or Edge.', 'bad');
+    document.getElementById('sub-btn').disabled = true;
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    setMsg('✓ Alerts active on this device.', 'good');
+    document.getElementById('sub-btn').textContent = 'Subscribed ✓';
+    document.getElementById('sub-btn').disabled = true;
+    document.getElementById('live-dot').classList.add('live');
+    setConn('ok');
+  }
+}
+
+async function handleSubscribe() {
+  if (!vapidKey) { setMsg('Server not ready. Refresh and try again.', 'bad'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { setMsg('Permission denied. Enable in phone settings.', 'bad'); return; }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
+    const resp = await fetch('/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+    if (resp.ok) {
+      setMsg('✓ Alerts active on this device.', 'good');
+      document.getElementById('sub-btn').textContent = 'Subscribed ✓';
+      document.getElementById('sub-btn').disabled = true;
+      document.getElementById('live-dot').classList.add('live');
+      setConn('ok');
+    } else {
+      setMsg('Server error. Try again.', 'bad');
+    }
+  } catch (err) {
+    setMsg('Error: ' + err.message, 'bad');
+  }
+}
+
+// ── Mute toggle
+function toggleMute() {
+  isMuted = !isMuted;
+  localStorage.setItem(MUTE_KEY, isMuted);
+  updateMuteUI();
+  showToast(isMuted ? '🔇 Sound alerts muted' : '🔔 Sound alerts on');
+}
+
+function updateMuteUI() {
+  const btn   = document.getElementById('mute-btn');
+  const icon  = document.getElementById('mute-icon');
+  const label = document.getElementById('mute-label');
+  if (isMuted) {
+    btn.classList.add('muted');
+    icon.textContent  = '🔇';
+    label.textContent = 'MUTED';
+  } else {
+    btn.classList.remove('muted');
+    icon.textContent  = '🔔';
+    label.textContent = 'SOUND';
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function renderAlerts() {
+  const list = document.getElementById('alert-list');
+  if (!alerts.length) {
+    list.innerHTML = '<div class="empty-state">No alerts yet.<br/>Alerts appear here when received.</div>';
+    return;
+  }
+  list.innerHTML = alerts.slice(0, 30).map(a => {
+    const time = new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="alert-item ${a.level || ''}">
+      <div class="alert-top">
+        <span class="alert-level ${a.level || ''}">${a.level || 'ALERT'}</span>
+        <span class="alert-time">${time}</span>
+      </div>
+      <div class="alert-title">${esc(a.title || '')}</div>
+      <div class="alert-body">${esc(a.body || '')}</div>
+    </div>`;
+  }).join('');
+}
+
+function addAlert(data) {
+  alerts.unshift(data);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts.slice(0, 50)));
+  renderAlerts();
+  if (!isMuted) playAlertSound();
+}
+
+// ── Audio alert — 5 seconds of repeating beep
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playAlertSound() {
+  if (isMuted) return;
+  try {
+    const ctx      = getAudioCtx();
+    const duration = 5.0;
+    const beepLen  = 0.18;
+    const gap      = 0.12;
+    const cycle    = beepLen + gap;
+    const now      = ctx.currentTime;
+
+    for (let t = 0; t < duration; t += cycle) {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now + t);
+      gain.gain.setValueAtTime(0, now + t);
+      gain.gain.linearRampToValueAtTime(0.6, now + t + 0.01);
+      gain.gain.linearRampToValueAtTime(0, now + t + beepLen);
+      osc.start(now + t);
+      osc.stop(now + t + beepLen);
+    }
+  } catch (e) {
+    console.warn('Audio playback failed:', e.message);
+  }
+}
+
+if (new URLSearchParams(location.search).get('sound') === '1') {
+  setTimeout(() => { if (!isMuted) playAlertSound(); }, 300);
+}
+
+function clearFeed() { alerts = []; localStorage.removeItem(STORAGE_KEY); renderAlerts(); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setMsg(msg, cls) { const el = document.getElementById('sub-msg'); el.textContent = msg; el.className = 'sub-status' + (cls ? ' ' + cls : ''); }
+function setConn(state) { const el = document.getElementById('conn-status'); el.textContent = state === 'ok' ? 'ONLINE' : state === 'warn' ? 'PARTIAL' : 'OFFLINE'; el.className = 'status-pill ' + state; }
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+renderAlerts();
+</script>
+</body>
+</html>
