@@ -277,7 +277,7 @@ function renderActiveSignals(signals) {
     return `<div class="active-signal-row ${dir}">
       <div>
         <div class="active-signal-sym">${esc(s.symbol || '')} <span style="color:var(--muted);font-weight:400">${esc(s.timeframe || '')}</span></div>
-        <div class="active-signal-meta">H4: ${esc(s.h4_trend || '—')} &nbsp;|&nbsp; D1: ${esc(s.d1_trend || '—')}</div>
+        // <div class="active-signal-meta">H4: ${esc(s.h4_trend || '—')} &nbsp;|&nbsp; D1: ${esc(s.d1_trend || '—')}</div>
       </div>
       <span class="active-signal-dir ${dir}">${dir === 'BUY' ? '🟢' : '🔴'} ${dir}</span>
     </div>`;
