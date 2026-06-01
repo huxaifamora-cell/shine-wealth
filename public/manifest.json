@@ -1,6 +1,6 @@
 {
-  "name": "Shine Wealth Monitor",
-  "short_name": "Shine Wealth",
+  "name": "Shinex Monitor",
+  "short_name": "Shinex",
   "description": "Boom & Crash signal notifications",
   "start_url": "/",
   "display": "standalone",
