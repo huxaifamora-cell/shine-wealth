@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  Shine Wealth Monitor — Alert Server
+//  ShineX Monitor — Alert Server
 //  Receives direct HTTP POST from MT5 EA → push notifications
 // ─────────────────────────────────────────────────────────────
 const express = require('express');
@@ -64,7 +64,7 @@ app.post('/subscribe', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Shine Wealth Monitor — main endpoint
+// ── Shinex Monitor — main endpoint
 //    EA posts JSON to root /  (it strips wss:// → https:// internally)
 //    Message types: heartbeat | signal | remove_signal
 app.post('/', async (req, res) => {
@@ -82,17 +82,17 @@ app.post('/', async (req, res) => {
     const sym = data.symbol     || '';
     const tf  = data.timeframe  || '';
     const dir = (data.trade_type || '').toUpperCase();
-    const h4  = data.h4_trend   || '';
-    const d1  = data.d1_trend   || '';
+    //const h4  = data.h4_trend   || '';
+    //const d1  = data.d1_trend   || '';
 
     const key = `${sym}_${tf}`;
     const emoji = dir === 'BUY' ? '🟢' : '🔴';
     const title = `${emoji} ${dir} — ${sym}`;
-    const body  = `${tf} | H4: ${h4} | D1: ${d1}`;
+    const body  = `${tf}`;
     const timestamp = Date.now();
 
     // Store as active signal
-    activeSignals.set(key, { title, body, level: dir, symbol: sym, timeframe: tf, h4_trend: h4, d1_trend: d1, timestamp });
+    activeSignals.set(key, { title, body, level: dir, symbol: sym, timeframe: tf, timestamp });
 
     await pushToAll(JSON.stringify({ title, body, level: dir, timestamp }));
     console.log(`[signal] ${sym} ${tf} ${dir} (active: ${activeSignals.size})`);
