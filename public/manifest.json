@@ -1,6 +1,6 @@
 {
-  "name": "Shinex Monitor",
-  "short_name": "Shinex",
+  "name": "ShineX Monitor",
+  "short_name": "ShineX",
   "description": "Boom & Crash signal notifications",
   "start_url": "/",
   "display": "standalone",
