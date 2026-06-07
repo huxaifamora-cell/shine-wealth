@@ -1,7 +1,7 @@
 {
-  "name": "trendrider-alert-app",
+  "name": "ShineX",
   "version": "1.0.0",
-  "description": "TrendRider signal push notification server",
+  "description": "boom and crash signal push notification server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
