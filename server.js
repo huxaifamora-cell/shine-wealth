@@ -9,7 +9,7 @@ const { initializeApp, cert } = require('firebase-admin/app');
 const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp({
-  credential: cert(require('./serviceAccountKey.json'))
+  credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
 });
 
 const app = express();
