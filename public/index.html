@@ -224,29 +224,20 @@
 </main>
 
 <div class="info-strip">
- If you are visting this page from the web, add it to your home-screen for app-like experience.<br/>
- - Android: tap ⋮ → "Add to Home Screen".<br/>
- - iPhone: tap Share → "Add to Home Screen".<br/>
+  Install this app on your phone for the best experience and reliable notifications.<br/>
   Notifications will arrive even when the app is closed.
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE_KEY  = 'shine_alerts';
-const MUTE_KEY     = 'shine_muted';
-let vapidKey = null;
-let alerts   = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-let isMuted  = localStorage.getItem(MUTE_KEY) === 'true';
+const STORAGE_KEY = 'shine_alerts';
+const MUTE_KEY    = 'shine_muted';
+let alerts  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let isMuted = localStorage.getItem(MUTE_KEY) === 'true';
 
 // ── Init mute state
 updateMuteUI();
-
-// ── Fetch VAPID key + existing signals in parallel
-fetch('/vapid-public-key')
-  .then(r => r.json())
-  .then(d => { vapidKey = d.key; checkExistingSubscription(); })
-  .catch(() => setMsg('Cannot reach server.', 'bad'));
 
 // ── Load active signals from server on startup
 fetch('/active-signals')
@@ -254,16 +245,29 @@ fetch('/active-signals')
   .then(d => renderActiveSignals(d.signals || []))
   .catch(() => renderActiveSignals([]));
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then(() => setConn('ok'))
-    .catch(() => setConn('warn'));
-}
+// ── Check if already subscribed via Firebase (on app launch)
+checkExistingSubscription();
 
-navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', e => {
-  if (e.data && e.data.type === 'NEW_ALERT')   handleIncomingAlert(e.data.payload);
-  if (e.data && e.data.type === 'PLAY_SOUND')  playAlertSound();
-});
+// ── Listen for messages from the native layer (foreground notifications)
+// When app is open, Firebase delivers via this listener instead of a system notification
+document.addEventListener('deviceready', () => {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseMessaging) {
+    const { FirebaseMessaging } = window.Capacitor.Plugins;
+
+    // Foreground message — app is open
+    FirebaseMessaging.addListener('notificationReceived', (event) => {
+      const data = event.notification.data || {};
+      handleIncomingAlert({
+        title:     event.notification.title || 'ShineX Signal',
+        body:      event.notification.body  || '',
+        level:     data.level     || '',
+        symbol:    data.symbol    || '',
+        timeframe: data.timeframe || '',
+        timestamp: data.timestamp ? parseInt(data.timestamp) : Date.now()
+      });
+    });
+  }
+}, { once: true });
 
 // ── Render active signals panel
 function renderActiveSignals(signals) {
@@ -277,48 +281,70 @@ function renderActiveSignals(signals) {
     return `<div class="active-signal-row ${dir}">
       <div>
         <div class="active-signal-sym">${esc(s.symbol || '')} <span style="color:var(--muted);font-weight:400">${esc(s.timeframe || '')}</span></div>
- 
       </div>
       <span class="active-signal-dir ${dir}">${dir === 'BUY' ? '🟢' : '🔴'} ${dir}</span>
     </div>`;
   }).join('');
 }
 
-// ── Handle incoming alert (from SW message)
+// ── Handle incoming alert (add to feed + play sound)
 function handleIncomingAlert(payload) {
   addAlert(payload);
-  // Refresh active signals panel
   fetch('/active-signals')
     .then(r => r.json())
     .then(d => renderActiveSignals(d.signals || []))
     .catch(() => {});
 }
 
+// ── Check if notification permission already granted (returning users)
 async function checkExistingSubscription() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    setMsg('Push not supported. Use Chrome or Edge.', 'bad');
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseMessaging) {
+    // Not running as native app — show a friendly message
+    setMsg('Please use the installed app for alerts.', 'bad');
     document.getElementById('sub-btn').disabled = true;
     return;
   }
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  if (sub) {
-    setMsg('✓ Alerts active on this device.', 'good');
-    document.getElementById('sub-btn').textContent = 'Subscribed ✓';
-    document.getElementById('sub-btn').disabled = true;
-    document.getElementById('live-dot').classList.add('live');
-    setConn('ok');
+  const { FirebaseMessaging } = window.Capacitor.Plugins;
+  try {
+    const permResult = await FirebaseMessaging.checkPermissions();
+    if (permResult.receive === 'granted') {
+      setMsg('✓ Alerts active on this device.', 'good');
+      document.getElementById('sub-btn').textContent = 'Subscribed ✓';
+      document.getElementById('sub-btn').disabled = true;
+      document.getElementById('live-dot').classList.add('live');
+      setConn('ok');
+    }
+  } catch (err) {
+    // No existing permission yet — leave the Enable Alerts button as-is
   }
 }
 
+// ── Subscribe button handler — registers with Firebase
 async function handleSubscribe() {
-  if (!vapidKey) { setMsg('Server not ready. Refresh and try again.', 'bad'); return; }
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') { setMsg('Permission denied. Enable in phone settings.', 'bad'); return; }
+  if (!window.Capacitor || !window.Capacitor.Plugins || !window.Capacitor.Plugins.FirebaseMessaging) {
+    setMsg('Please use the installed app for alerts.', 'bad');
+    return;
+  }
+  const { FirebaseMessaging } = window.Capacitor.Plugins;
+
   try {
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
-    const resp = await fetch('/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+    // Request OS-level notification permission
+    const permResult = await FirebaseMessaging.requestPermissions();
+    if (permResult.receive !== 'granted') {
+      setMsg('Permission denied. Enable in phone settings.', 'bad');
+      return;
+    }
+
+    // Get the Firebase device token
+    const { token } = await FirebaseMessaging.getToken();
+
+    // Send token to your server
+    const resp = await fetch('/subscribe', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ token, platform: 'android' })
+    });
+
     if (resp.ok) {
       setMsg('✓ Alerts active on this device.', 'good');
       document.getElementById('sub-btn').textContent = 'Subscribed ✓';
@@ -389,58 +415,52 @@ function addAlert(data) {
   if (!isMuted) playAlertSound();
 }
 
-// ── Audio alert — 5 seconds of repeating beep
+// ── Audio alert (foreground only — OS handles sound when app is closed)
 let audioCtx = null;
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
 
-function playAlertSound() {
-  if (isMuted) return;
-  try {
-    const ctx      = getAudioCtx();
-    const duration = 5.0;
-    const beepLen  = 0.18;
-    const gap      = 0.12;
-    const cycle    = beepLen + gap;
-    const now      = ctx.currentTime;
+function scheduleBeeps(ctx) {
+  const duration = 5.0;
+  const beepLen  = 0.18;
+  const gap      = 0.12;
+  const cycle    = beepLen + gap;
+  const now      = ctx.currentTime;
 
-    for (let t = 0; t < duration; t += cycle) {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now + t);
-      gain.gain.setValueAtTime(0, now + t);
-      gain.gain.linearRampToValueAtTime(0.6, now + t + 0.01);
-      gain.gain.linearRampToValueAtTime(0, now + t + beepLen);
-      osc.start(now + t);
-      osc.stop(now + t + beepLen);
-    }
-  } catch (e) {
-    console.warn('Audio playback failed:', e.message);
+  for (let t = 0; t < duration; t += cycle) {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, now + t);
+    gain.gain.setValueAtTime(0, now + t);
+    gain.gain.linearRampToValueAtTime(0.6, now + t + 0.01);
+    gain.gain.linearRampToValueAtTime(0, now + t + beepLen);
+    osc.start(now + t);
+    osc.stop(now + t + beepLen);
   }
 }
 
-if (new URLSearchParams(location.search).get('sound') === '1') {
-  setTimeout(() => { if (!isMuted) playAlertSound(); }, 300);
+async function playAlertSound() {
+  if (isMuted) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') {
+      await ctx.resume().catch(() => {});
+    }
+    if (ctx.state === 'running') scheduleBeeps(ctx);
+  } catch (e) {
+    console.warn('Audio playback failed:', e.message);
+  }
 }
 
 function clearFeed() { alerts = []; localStorage.removeItem(STORAGE_KEY); renderAlerts(); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function setMsg(msg, cls) { const el = document.getElementById('sub-msg'); el.textContent = msg; el.className = 'sub-status' + (cls ? ' ' + cls : ''); }
 function setConn(state) { const el = document.getElementById('conn-status'); el.textContent = state === 'ok' ? 'ONLINE' : state === 'warn' ? 'PARTIAL' : 'OFFLINE'; el.className = 'status-pill ' + state; }
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
-  return output;
-}
 
 renderAlerts();
 </script>
