@@ -164,15 +164,16 @@ app.post('/', async (req, res) => {
 
     // Remove from active signals store
     activeSignals.delete(key);
-
-    await pushToAll(JSON.stringify({
-      title: `⚪ Signal ended — ${sym}`,
-      body:  `${tf} conditions no longer met`,
-      level: 'REMOVED',
-      symbol: sym,
-      timeframe: tf,
-      timestamp: Date.now()
-    }));
+    
+    // Commented out — no notification sent when signal ends
+   // await pushToAll(JSON.stringify({
+     // title: `⚪ Signal ended — ${sym}`,
+      //body:  `${tf} conditions no longer met`,
+      //level: 'REMOVED',
+      //symbol: sym,
+      //timeframe: tf,
+      //timestamp: Date.now()
+    //}));
     console.log(`[removed] ${sym} ${tf} (active: ${activeSignals.size})`);
   }
 });
